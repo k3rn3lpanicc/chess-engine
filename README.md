@@ -8,6 +8,7 @@ A full-featured **C chess engine** playable in the terminal — with **Unicode b
 
 > 🖼️ *Board Rendering Example:*
 > ![session](images/image.png)
+
 > 🖼️ *Gameplay Example (Player vs AI):*
 > ![gameplay example](./images/image2.png)
 
