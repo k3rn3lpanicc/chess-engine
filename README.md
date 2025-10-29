@@ -2,6 +2,8 @@
 
 A full-featured **C chess engine** playable in the terminal — with **Unicode board drawing**, **AI opponent** powered by **Minimax with alpha–beta pruning**, and full support for **castling**, **pawn promotion**, and **checkmate/stalemate detection**.
 
+Estimated Chess.com rating based on Rating bots: 1700-2000
+
 ---
 
 ## 📸 Preview
