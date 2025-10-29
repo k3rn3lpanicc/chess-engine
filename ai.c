@@ -251,3 +251,56 @@ int engine(Board *b, char color, int depth)
     }
     return 1; // moved
 }
+
+int count_legal_moves(Board *b, char color)
+{
+    Move moves[256];
+    int n = 0;
+    collect_legal_moves(b, color, moves, &n);
+    return n;
+}
+
+int adaptive_depth_by_moves(Board *b, char color)
+{
+    int n = count_legal_moves(b, color);
+    if (n >= 40)
+        return 4;
+    else if (n >= 19)
+        return 5;
+    else if (n >= 8)
+        return 6;
+    else if (n >= 4)
+        return 7;
+    else
+        return 8;
+}
+
+double phase_score(Board *b)
+{
+    const double val[128] = {['P'] = 1, ['N'] = 3, ['B'] = 3, ['R'] = 5, ['Q'] = 9};
+    double total = 0;
+    for (int i = 0; i < 8; i++)
+        for (int j = 0; j < 8; j++)
+            if (b->cells[i][j].state != 'E')
+                total += val[(int)b->cells[i][j].piece];
+    // Normalize: 78 = typical full material (both sides except kings)
+    return total / 78.0; // 1.0 = opening, 0.0 = empty board (endgame)
+}
+
+int adaptive_depth_combined(Board *b, char color)
+{
+    int n = count_legal_moves(b, color);
+    double phase = phase_score(b); // 1.0 opening → 0.0 endgame
+
+    // Base depth determined by branching
+    double base = 8.0 - log2(n + 1); // fewer moves → higher base
+    // Adjust by phase: deeper search in endgames
+    double depth = base + (1.5 * (1.0 - phase)); // up to +1.5 ply deeper
+
+    // Clamp and round
+    if (depth < 5)
+        depth = 5;
+    if (depth > 8)
+        depth = 8;
+    return (int)round(depth);
+}

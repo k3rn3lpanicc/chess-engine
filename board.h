@@ -2,7 +2,6 @@
 #define BOARD_H
 
 #include <stddef.h>
-
 typedef struct
 {
     char state; // 'W', 'B', or 'E'

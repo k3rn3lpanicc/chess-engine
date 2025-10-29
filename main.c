@@ -17,11 +17,11 @@ int main()
     char init_key[512];
     position_key(&board, 'W', init_key, sizeof(init_key));
     history_increment(&board, init_key);
+    board_draw(&board, NULL, 0);
 
     while (1)
     {
         // ---------- White (human) ----------
-        board_draw(&board, NULL, 0);
 
         if (board_is_checkmate(&board, 'W'))
         {
@@ -38,12 +38,14 @@ int main()
             printf("White is in check!\n");
         }
 
-        // ask for a white piece with at least one legal move
+        //         // ask for a white piece with at least one legal move
         while (1)
         {
             double ev = evaluate_board(&board, 'W');
             printf("Board evaluation of White: %.2f\n", ev);
-            printf("[AI] Using search depth = %d (based on %d pieces)\n", adaptive_depth(&board), count_pieces(&board));
+            int depthW = adaptive_depth(&board);
+            printf("[AI] Using adaptive depth = %d (moves: %d, phase:%.2f)\n",
+                   depthW, count_legal_moves(&board, 'B'), phase_score(&board));
             printf("Select white piece to move (e.g., e2): ");
             char buf[64];
             if (!input_line(buf, sizeof(buf)))
@@ -126,6 +128,12 @@ int main()
             break;
         }
 
+        // // ---------- White (AI) ----------
+        // int depthW = adaptive_depth_combined(&board, 'W');
+        // int statusW = engine(&board, 'W', depthW);
+        // if (!statusW)
+        //     break;
+
         // ---------- Black (AI) ----------
         int depth = adaptive_depth(&board);
         int status = engine(&board, 'B', depth);
@@ -148,13 +156,6 @@ int main()
         {
             printf("White is in check!\n");
         }
-
-#ifdef _WIN32
-        Sleep(100);
-#else
-        struct timespec ts = {0, 100 * 1000000};
-        nanosleep(&ts, NULL);
-#endif
     }
 
     return 0;

@@ -15,4 +15,8 @@ void collect_legal_moves(Board *b, char color, Move *out, int *out_n);
 void make_move(Board *b, int from_x, int from_y, int to_x, int to_y, Snapshot *snap);
 void undo_move(Board *b, int from_x, int from_y, int to_x, int to_y, Snapshot *snap);
 int engine(Board *b, char color, int depth);
+int count_legal_moves(Board *b, char color);
+int adaptive_depth_by_moves(Board *b, char color);
+double phase_score(Board *b);
+int adaptive_depth_combined(Board *b, char color);
 #endif
