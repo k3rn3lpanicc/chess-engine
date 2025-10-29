@@ -396,3 +396,32 @@ void get_attack_squares(Board *b, int x, int y, Pos *out, int *out_count)
         return;
     }
 }
+
+int count_pieces(Board *b)
+{
+    int count = 0;
+    for (int i = 0; i < 8; i++)
+    {
+        for (int j = 0; j < 8; j++)
+        {
+            if (b->cells[i][j].state != 'E')
+                count++;
+        }
+    }
+    return count;
+}
+
+int adaptive_depth(Board *b)
+{
+    int pieces = count_pieces(b);
+    if (pieces >= 26)
+        return 5;
+    else if (pieces >= 18)
+        return 6;
+    else if (pieces >= 10)
+        return 7;
+    else if (pieces >= 7)
+        return 8;
+    else
+        return 9;
+}

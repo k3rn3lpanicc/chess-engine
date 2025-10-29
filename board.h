@@ -44,4 +44,6 @@ void position_key(Board *b, char color_to_move, char *out, size_t out_sz);
 void history_increment(Board *b, const char *key);
 int board_threefold(Board *b, char color_to_move);
 void get_attack_squares(Board *b, int x, int y, Pos *out, int *out_count);
+int count_pieces(Board *b);
+int adaptive_depth(Board *b);
 #endif

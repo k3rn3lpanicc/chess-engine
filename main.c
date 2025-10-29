@@ -43,6 +43,7 @@ int main()
         {
             double ev = evaluate_board(&board, 'W');
             printf("Board evaluation of White: %.2f\n", ev);
+            printf("[AI] Using search depth = %d (based on %d pieces)\n", adaptive_depth(&board), count_pieces(&board));
             printf("Select white piece to move (e.g., e2): ");
             char buf[64];
             if (!input_line(buf, sizeof(buf)))
@@ -126,7 +127,8 @@ int main()
         }
 
         // ---------- Black (AI) ----------
-        int status = engine(&board, 'B', 5);
+        int depth = adaptive_depth(&board);
+        int status = engine(&board, 'B', depth);
         if (!status)
             break;
 
