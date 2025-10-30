@@ -113,28 +113,134 @@ void order_moves(Board *b, Move *moves, int n, char color)
     free(scores);
 }
 
-void make_move(Board *b, int from_x, int from_y, int to_x, int to_y, Snapshot *snap)
+void make_move(Board *b, int fx, int fy, int tx, int ty, Snapshot *s)
 {
-    snap->from = b->cells[from_x][from_y];
-    snap->to = b->cells[to_x][to_y];
-    b->cells[to_x][to_y] = b->cells[from_x][from_y];
-    b->cells[from_x][from_y] = (Cell){'E', 0};
+    s->from = b->cells[fx][fy];
+    s->to = b->cells[tx][ty];
 
-    if (b->cells[to_x][to_y].piece == 'P')
+    // Save castling rights
+    s->castling_W_K = b->castling_W_K;
+    s->castling_W_Q = b->castling_W_Q;
+    s->castling_B_K = b->castling_B_K;
+    s->castling_B_Q = b->castling_B_Q;
+
+    s->did_castle = 0;
+    s->did_promo = 0;
+
+    char piece = b->cells[fx][fy].piece;
+    char color = b->cells[fx][fy].state;
+
+    // Move the piece
+    b->cells[tx][ty] = b->cells[fx][fy];
+    b->cells[fx][fy] = (Cell){'E', 0};
+
+    // Handle castling (king moved 2 files)
+    if (piece == 'K' && abs(ty - fy) == 2)
     {
-        if ((b->cells[to_x][to_y].state == 'W' && to_x == 0) ||
-            (b->cells[to_x][to_y].state == 'B' && to_x == 7))
+        int row = fx;
+        if (ty > fy)
+        { // kingside
+            // rook h -> f
+            b->cells[row][5] = b->cells[row][7];
+            b->cells[row][7] = (Cell){'E', 0};
+            s->did_castle = 1;
+            s->rook_fx = row;
+            s->rook_fy = 7;
+            s->rook_tx = row;
+            s->rook_ty = 5;
+        }
+        else
+        { // queenside
+            // rook a -> d
+            b->cells[row][3] = b->cells[row][0];
+            b->cells[row][0] = (Cell){'E', 0};
+            s->did_castle = -1;
+            s->rook_fx = row;
+            s->rook_fy = 0;
+            s->rook_tx = row;
+            s->rook_ty = 3;
+        }
+        // Revoke castling rights for that side
+        if (color == 'W')
         {
-            b->cells[to_x][to_y].piece = 'Q';
+            b->castling_W_K = 0;
+            b->castling_W_Q = 0;
+        }
+        else
+        {
+            b->castling_B_K = 0;
+            b->castling_B_Q = 0;
         }
     }
-    // NOTE: As in Python AI, this does NOT update castling rook movement or rights.
+
+    // Revoke rights if king/rook moved (non-castling moves)
+    if (piece == 'K')
+    {
+        if (color == 'W')
+        {
+            b->castling_W_K = 0;
+            b->castling_W_Q = 0;
+        }
+        else
+        {
+            b->castling_B_K = 0;
+            b->castling_B_Q = 0;
+        }
+    }
+    else if (piece == 'R')
+    {
+        if (color == 'W')
+        {
+            if (fx == 7 && fy == 0)
+                b->castling_W_Q = 0;
+            else if (fx == 7 && fy == 7)
+                b->castling_W_K = 0;
+        }
+        else
+        {
+            if (fx == 0 && fy == 0)
+                b->castling_B_Q = 0;
+            else if (fx == 0 && fy == 7)
+                b->castling_B_K = 0;
+        }
+    }
+
+    // Handle promotion
+    if (piece == 'P')
+    {
+        if ((color == 'W' && tx == 0) || (color == 'B' && tx == 7))
+        {
+            s->did_promo = 1;
+            s->promo_prev_piece = 'P';
+            b->cells[tx][ty].piece = 'Q';
+        }
+    }
 }
 
-void undo_move(Board *b, int from_x, int from_y, int to_x, int to_y, Snapshot *snap)
+void undo_move(Board *b, int fx, int fy, int tx, int ty, Snapshot *s)
 {
-    b->cells[from_x][from_y] = snap->from;
-    b->cells[to_x][to_y] = snap->to;
+    // Undo promotion
+    if (s->did_promo)
+    {
+        b->cells[tx][ty].piece = s->promo_prev_piece; // back to pawn
+    }
+
+    // Undo castling rook move if any
+    if (s->did_castle != 0)
+    {
+        b->cells[s->rook_fx][s->rook_fy] = b->cells[s->rook_tx][s->rook_ty];
+        b->cells[s->rook_tx][s->rook_ty] = (Cell){'E', 0};
+    }
+
+    // Restore the piece move
+    b->cells[fx][fy] = s->from;
+    b->cells[tx][ty] = s->to;
+
+    // Restore castling rights
+    b->castling_W_K = s->castling_W_K;
+    b->castling_W_Q = s->castling_W_Q;
+    b->castling_B_K = s->castling_B_K;
+    b->castling_B_Q = s->castling_B_Q;
 }
 
 double minimax(Board *b, int depth, double alpha, double beta, int maximizing, char color_to_move, Move *best)

@@ -148,7 +148,7 @@ int pos_in_list(Pos *list, int n, int x, int y)
 
 void board_draw(Board *b, Pos *highlights, int n_highlights)
 {
-    // clear_console();
+    clear_console();
     const char *top_border = "  \xE2\x94\x8C"
                              "───\xE2\x94\xAC"
                              "───\xE2\x94\xAC"

@@ -38,7 +38,7 @@ int main()
             printf("White is in check!\n");
         }
 
-        //         // ask for a white piece with at least one legal move
+        // ask for a white piece with at least one legal move
         while (1)
         {
             double ev = evaluate_board(&board, 'W');

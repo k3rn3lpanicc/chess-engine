@@ -5,6 +5,13 @@ typedef struct
 {
     Cell to;
     Cell from;
+    // Extra for full reversibility:
+    int castling_W_K, castling_W_Q, castling_B_K, castling_B_Q;
+    int did_castle;        // 0 no, 1 kingside, -1 queenside
+    int rook_fx, rook_fy;  // rook from (for castling)
+    int rook_tx, rook_ty;  // rook to   (for castling)
+    int did_promo;         // 1 if we promoted a pawn
+    char promo_prev_piece; // original piece before promotion (should be 'P')
 } Snapshot;
 int board_threefold(Board *b, char color_to_move);
 double evaluate_board(Board *b, char color_to_move);
