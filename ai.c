@@ -21,7 +21,7 @@ int board_threefold(Board *b, char color_to_move)
 
 double evaluate_board(Board *b, char color_to_move)
 {
-    const double values[128] = {['P'] = 1, ['N'] = 3, ['B'] = 3, ['R'] = 5, ['Q'] = 9, ['K'] = 100};
+    const double values[128] = {['P'] = 100, ['N'] = 320, ['B'] = 330, ['R'] = 500, ['Q'] = 900, ['K'] = 20000};
     double score = 0.0;
 
     if (board_threefold(b, color_to_move))
@@ -43,9 +43,9 @@ double evaluate_board(Board *b, char color_to_move)
     }
 
     if (board_is_in_check(b, 'B'))
-        score += 0.5;
+        score += 50;
     if (board_is_in_check(b, 'W'))
-        score -= 0.5;
+        score -= 50;
 
     if (board_is_checkmate(b, 'B'))
         score += 1e10;
@@ -78,10 +78,38 @@ void collect_legal_moves(Board *b, char color, Move *out, int *out_n)
     }
 }
 
+void collect_capture_moves(Board *b, char color, Move *out, int *out_n)
+{
+    *out_n = 0;
+    for (int i = 0; i < 8; i++)
+    {
+        for (int j = 0; j < 8; j++)
+        {
+            if (b->cells[i][j].state != color)
+                continue;
+            Pos ps[64];
+            int pn = 0, ln = 0;
+            get_available_moves(b, i, j, 0, ps, &pn);
+            Pos leg[64];
+            filter_legal_moves(b, i, j, ps, pn, color, leg, &ln);
+            for (int k = 0; k < ln; k++)
+            {
+                // Only include captures
+                Cell target = b->cells[leg[k].x][leg[k].y];
+                if (target.state != 'E' && target.state != color)
+                {
+                    out[*out_n] = (Move){i, j, leg[k].x, leg[k].y};
+                    (*out_n)++;
+                }
+            }
+        }
+    }
+}
+
 void order_moves(Board *b, Move *moves, int n, char color)
 {
     // Simple MVV-LVA: 10*victim - attacker
-    int val[128] = {['P'] = 1, ['N'] = 3, ['B'] = 3, ['R'] = 5, ['Q'] = 9, ['K'] = 1000};
+    int val[128] = {['P'] = 100, ['N'] = 320, ['B'] = 330, ['R'] = 500, ['Q'] = 900, ['K'] = 20000};
     int *scores = (int *)malloc(sizeof(int) * n);
     for (int i = 0; i < n; i++)
     {
@@ -243,13 +271,154 @@ void undo_move(Board *b, int fx, int fy, int tx, int ty, Snapshot *s)
     b->castling_B_Q = s->castling_B_Q;
 }
 
-double minimax(Board *b, int depth, double alpha, double beta, int maximizing, char color_to_move, Move *best)
+// Quiescence search with delta pruning to handle tactical positions
+double quiescence(Board *b, double alpha, double beta, int maximizing, char color_to_move, int ply_from_root)
 {
+    const int MAX_QUIESCE_DEPTH = 10;
+    
+    // Penalize repetitions heavily to avoid tempo moves
     if (board_threefold(b, color_to_move))
         return 0.0;
+    
+    // Check for two-fold repetition and discourage it
+    char key[512];
+    position_key(b, color_to_move, key, sizeof(key));
+    int rep_count = 0;
+    for (int i = 0; i < b->history_size; i++)
+    {
+        if (strcmp(b->history[i].key, key) == 0)
+        {
+            rep_count = b->history[i].count;
+            break;
+        }
+    }
+    if (rep_count >= 2)
+        return maximizing ? -50.0 : 50.0; // Penalize repetition
+    
+    // Stand pat evaluation
+    double stand_pat = evaluate_board(b, color_to_move);
+    
+    // Depth-dependent scoring: reduce score as we go deeper to prefer shorter mates
+    if (stand_pat > 1e9) // Checkmate for white
+        stand_pat -= ply_from_root * 10;
+    else if (stand_pat < -1e9) // Checkmate for black
+        stand_pat += ply_from_root * 10;
+    
+    if (ply_from_root >= MAX_QUIESCE_DEPTH)
+        return stand_pat;
+    
+    if (maximizing)
+    {
+        if (stand_pat >= beta)
+            return beta;
+        if (alpha < stand_pat)
+            alpha = stand_pat;
+    }
+    else
+    {
+        if (stand_pat <= alpha)
+            return alpha;
+        if (beta > stand_pat)
+            beta = stand_pat;
+    }
+    
+    // Only search captures
+    char color = maximizing ? 'W' : 'B';
+    Move moves[256];
+    int n = 0;
+    collect_capture_moves(b, color, moves, &n);
+    order_moves(b, moves, n, color);
+    
+    // Delta pruning: skip if no capture can improve position
+    const double DELTA_MARGIN = 900.0; // Queen value
+    if (maximizing)
+    {
+        if (stand_pat + DELTA_MARGIN < alpha && n > 0)
+        {
+            // Check if even best capture can't reach alpha
+            Cell target = b->cells[moves[0].to_x][moves[0].to_y];
+            const double values[128] = {['P'] = 100, ['N'] = 320, ['B'] = 330, ['R'] = 500, ['Q'] = 900};
+            double best_capture_value = (target.state != 'E') ? values[(int)target.piece] : 0;
+            if (stand_pat + best_capture_value + DELTA_MARGIN < alpha)
+                return alpha;
+        }
+    }
+    else
+    {
+        if (stand_pat - DELTA_MARGIN > beta && n > 0)
+        {
+            Cell target = b->cells[moves[0].to_x][moves[0].to_y];
+            const double values[128] = {['P'] = 100, ['N'] = 320, ['B'] = 330, ['R'] = 500, ['Q'] = 900};
+            double best_capture_value = (target.state != 'E') ? values[(int)target.piece] : 0;
+            if (stand_pat - best_capture_value - DELTA_MARGIN > beta)
+                return beta;
+        }
+    }
+    
+    double best_eval = stand_pat;
+    
+    for (int i = 0; i < n; i++)
+    {
+        Snapshot snap;
+        make_move(b, moves[i].from_x, moves[i].from_y, moves[i].to_x, moves[i].to_y, &snap);
+        
+        double val = quiescence(b, alpha, beta, !maximizing, opposite_color(color_to_move), ply_from_root + 1);
+        
+        undo_move(b, moves[i].from_x, moves[i].from_y, moves[i].to_x, moves[i].to_y, &snap);
+        
+        if (maximizing)
+        {
+            if (val > best_eval)
+                best_eval = val;
+            if (val > alpha)
+                alpha = val;
+            if (beta <= alpha)
+                break;
+        }
+        else
+        {
+            if (val < best_eval)
+                best_eval = val;
+            if (val < beta)
+                beta = val;
+            if (beta <= alpha)
+                break;
+        }
+    }
+    
+    return best_eval;
+}
+
+double minimax(Board *b, int depth, double alpha, double beta, int maximizing, char color_to_move, Move *best, int ply_from_root)
+{
+    // Penalize three-fold repetition
+    if (board_threefold(b, color_to_move))
+        return 0.0;
+    
+    // Detect and heavily penalize two-fold repetition to prevent tempo moves
+    char key[512];
+    position_key(b, color_to_move, key, sizeof(key));
+    int rep_count = 0;
+    for (int i = 0; i < b->history_size; i++)
+    {
+        if (strcmp(b->history[i].key, key) == 0)
+        {
+            rep_count = b->history[i].count;
+            break;
+        }
+    }
+    
+    // Strong penalty for repeating positions
+    if (rep_count >= 2)
+    {
+        double penalty = maximizing ? -200.0 : 200.0;
+        return penalty;
+    }
+    
     if (depth == 0 || board_is_checkmate(b, 'W') || board_is_checkmate(b, 'B') || board_is_stalemate(b, 'W') || board_is_stalemate(b, 'B'))
     {
-        return evaluate_board(b, color_to_move);
+        // Use quiescence search instead of static evaluation
+        return quiescence(b, alpha, beta, maximizing, color_to_move, ply_from_root);
     }
 
     char color = maximizing ? 'W' : 'B';
@@ -258,17 +427,26 @@ double minimax(Board *b, int depth, double alpha, double beta, int maximizing, c
     collect_legal_moves(b, color, moves, &n);
     order_moves(b, moves, n, color);
     if (n == 0)
-        return evaluate_board(b, color_to_move);
+        return quiescence(b, alpha, beta, maximizing, color_to_move, ply_from_root);
 
     double best_eval = maximizing ? -INFINITY : INFINITY;
     Move best_local = moves[0];
 
     for (int i = 0; i < n; i++)
     {
+        // Heavily penalize moves that undo the last move (tempo moves)
+        if (ply_from_root == 0 && b->has_last_move &&
+            moves[i].from_x == b->last_to_x && moves[i].from_y == b->last_to_y &&
+            moves[i].to_x == b->last_from_x && moves[i].to_y == b->last_from_y)
+        {
+            // This is an immediate undo move - skip it at root
+            continue;
+        }
+        
         Snapshot snap;
         make_move(b, moves[i].from_x, moves[i].from_y, moves[i].to_x, moves[i].to_y, &snap);
 
-        double val = minimax(b, depth - 1, alpha, beta, !maximizing, opposite_color(color_to_move), NULL);
+        double val = minimax(b, depth - 1, alpha, beta, !maximizing, opposite_color(color_to_move), NULL, ply_from_root + 1);
 
         undo_move(b, moves[i].from_x, moves[i].from_y, moves[i].to_x, moves[i].to_y, &snap);
 
@@ -326,11 +504,11 @@ int engine(Board *b, char color, int depth)
     double score;
     if (color == 'W')
     {
-        score = minimax(b, depth, -INFINITY, INFINITY, 1, 'W', &best);
+        score = minimax(b, depth, -INFINITY, INFINITY, 1, 'W', &best, 0);
     }
     else
     {
-        score = minimax(b, depth, -INFINITY, INFINITY, 0, 'B', &best);
+        score = minimax(b, depth, -INFINITY, INFINITY, 0, 'B', &best, 0);
     }
 
     // Apply best

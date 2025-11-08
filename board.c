@@ -19,6 +19,7 @@ void board_init(Board *b)
     b->castling_B_K = 1;
     b->castling_B_Q = 1;
     b->history_size = 0;
+    b->has_last_move = 0;
 
     // Place pieces (same as Python create_empty_board)
     const char order[8] = {'R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R'};
@@ -306,6 +307,13 @@ void board_apply_move(Board *b, int from_x, int from_y, int to_x, int to_y)
         }
     }
 
+    // Track last move to prevent immediate undo
+    b->last_from_x = from_x;
+    b->last_from_y = from_y;
+    b->last_to_x = to_x;
+    b->last_to_y = to_y;
+    b->has_last_move = 1;
+    
     // Update repetition table with next side to move
     char next = opposite_color(color);
     char key[512];

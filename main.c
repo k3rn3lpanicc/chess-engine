@@ -17,36 +17,68 @@ int main()
     char init_key[512];
     position_key(&board, 'W', init_key, sizeof(init_key));
     history_increment(&board, init_key);
+    
+    // Ask player to choose color
+    char player_color = 'W';
+    printf("Welcome to Chess Engine!\n");
+    printf("Choose your color (W for White, B for Black): ");
+    char color_buf[64];
+    if (input_line(color_buf, sizeof(color_buf)))
+    {
+        if (color_buf[0] == 'B' || color_buf[0] == 'b')
+        {
+            player_color = 'B';
+            printf("You are playing as Black.\n");
+        }
+        else
+        {
+            player_color = 'W';
+            printf("You are playing as White.\n");
+        }
+    }
+    
     board_draw(&board, NULL, 0);
+    
+    // If player is Black, let AI play first
+    if (player_color == 'B')
+    {
+        printf("AI (White) is making the first move...\n");
+        int depth = adaptive_depth(&board);
+        int status = engine(&board, 'W', depth);
+        if (!status)
+            return 0;
+        board_draw(&board, NULL, 0);
+    }
 
     while (1)
     {
-        // ---------- White (human) ----------
+        // ---------- Player's turn ----------
 
-        if (board_is_checkmate(&board, 'W'))
+        if (board_is_checkmate(&board, player_color))
         {
-            printf("Checkmate! Black wins.\n");
+            printf("Checkmate! %s wins.\n", (player_color == 'W') ? "Black" : "White");
             break;
         }
-        if (board_is_stalemate(&board, 'W'))
+        if (board_is_stalemate(&board, player_color))
         {
             printf("Stalemate! Draw.\n");
             break;
         }
-        if (board_is_in_check(&board, 'W'))
+        if (board_is_in_check(&board, player_color))
         {
-            printf("White is in check!\n");
+            printf("%s is in check!\n", (player_color == 'W') ? "White" : "Black");
         }
 
-        // ask for a white piece with at least one legal move
+        // ask for a piece with at least one legal move
         while (1)
         {
-            double ev = evaluate_board(&board, 'W');
-            printf("Board evaluation of White: %.2f\n", ev);
+            double ev = evaluate_board(&board, player_color);
+            printf("Board evaluation of %s: %.2f\n", (player_color == 'W') ? "White" : "Black", ev);
+            char ai_color = opposite_color(player_color);
             int depthW = adaptive_depth(&board);
             printf("[AI] Using adaptive depth = %d (moves: %d, phase:%.2f)\n",
-                   depthW, count_legal_moves(&board, 'B'), phase_score(&board));
-            printf("Select white piece to move (e.g., e2): ");
+                   depthW, count_legal_moves(&board, ai_color), phase_score(&board));
+            printf("Select %s piece to move (e.g., e2): ", (player_color == 'W') ? "white" : "black");
             char buf[64];
             if (!input_line(buf, sizeof(buf)))
                 return 0;
@@ -56,16 +88,16 @@ int main()
                 printf("Invalid input. Try again.\n");
                 continue;
             }
-            if (board.cells[from_x][from_y].state != 'W')
+            if (board.cells[from_x][from_y].state != player_color)
             {
-                printf("That's not a white piece. Try again.\n");
+                printf("That's not a %s piece. Try again.\n", (player_color == 'W') ? "white" : "black");
                 continue;
             }
             Pos ps[64];
             int pn = 0, ln = 0;
             get_available_moves(&board, from_x, from_y, 1, ps, &pn);
             Pos leg[64];
-            filter_legal_moves(&board, from_x, from_y, ps, pn, 'W', leg, &ln);
+            filter_legal_moves(&board, from_x, from_y, ps, pn, player_color, leg, &ln);
             if (ln == 0)
             {
                 printf("No legal moves for that piece. Try another.\n");
@@ -128,33 +160,28 @@ int main()
             break;
         }
 
-        // // ---------- White (AI) ----------
-        // int depthW = adaptive_depth_combined(&board, 'W');
-        // int statusW = engine(&board, 'W', depthW);
-        // if (!statusW)
-        //     break;
-
-        // ---------- Black (AI) ----------
+        // ---------- AI's turn ----------
+        char ai_color = opposite_color(player_color);
         int depth = adaptive_depth(&board);
-        int status = engine(&board, 'B', depth);
+        int status = engine(&board, ai_color, depth);
         if (!status)
             break;
 
-        // Post-move checks on White
+        // Post-move checks on player
         board_draw(&board, NULL, 0);
-        if (board_is_checkmate(&board, 'W'))
+        if (board_is_checkmate(&board, player_color))
         {
-            printf("Checkmate! Black wins.\n");
+            printf("Checkmate! %s wins.\n", (player_color == 'W') ? "Black" : "White");
             break;
         }
-        if (board_is_stalemate(&board, 'W'))
+        if (board_is_stalemate(&board, player_color))
         {
             printf("Stalemate! Draw.\n");
             break;
         }
-        if (board_is_in_check(&board, 'W'))
+        if (board_is_in_check(&board, player_color))
         {
-            printf("White is in check!\n");
+            printf("%s is in check!\n", (player_color == 'W') ? "White" : "Black");
         }
     }
 

@@ -18,6 +18,9 @@ typedef struct
         int count;
     } history[8192];
     int history_size;
+    // Track last move to prevent immediate undo
+    int last_from_x, last_from_y, last_to_x, last_to_y;
+    int has_last_move;
 } Board;
 
 typedef struct

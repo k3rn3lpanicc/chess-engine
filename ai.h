@@ -15,8 +15,10 @@ typedef struct
 } Snapshot;
 int board_threefold(Board *b, char color_to_move);
 double evaluate_board(Board *b, char color_to_move);
-double minimax(Board *b, int depth, double alpha, double beta, int maximizing_player, char color_to_move, Move *best);
+double quiescence(Board *b, double alpha, double beta, int maximizing_player, char color_to_move, int ply_from_root);
+double minimax(Board *b, int depth, double alpha, double beta, int maximizing_player, char color_to_move, Move *best, int ply_from_root);
 void order_moves(Board *b, Move *moves, int n, char color);
+void collect_capture_moves(Board *b, char color, Move *out, int *out_n);
 void get_attack_squares(Board *b, int x, int y, Pos *out, int *out_count);
 void collect_legal_moves(Board *b, char color, Move *out, int *out_n);
 void make_move(Board *b, int from_x, int from_y, int to_x, int to_y, Snapshot *snap);
