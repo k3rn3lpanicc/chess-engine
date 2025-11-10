@@ -149,114 +149,192 @@ int pos_in_list(Pos *list, int n, int x, int y)
 void board_draw(Board *b, Pos *highlights, int n_highlights)
 {
     clear_console();
-    printf("\n     a    b    c    d    e    f    g    h\n");
+
+    // Top border
+    printf("\n   ╔══════════════════════════════════════╗\n");
+    printf("   ║    a   b   c   d   e   f   g   h     ║\n");
+    printf("   ╠══════════════════════════════════════╣\n");
 
     for (int i = 0; i < 8; i++)
     {
-        // Print two lines per row to make squares more square-shaped
-        for (int line = 0; line < 2; line++)
+        printf("   ║ %d ", 8 - i);
+
+        for (int j = 0; j < 8; j++)
         {
-            if (line == 0)
-                printf("  %d ", 8 - i);
-            else
-                printf("    ");
-                
-            for (int j = 0; j < 8; j++)
-            {
-                Cell c = b->cells[i][j];
-                int hl = pos_in_list(highlights, n_highlights, i, j);
-                
-                // Determine if square is light or dark
-                int is_light_square = (i + j) % 2 == 0;
+            Cell c = b->cells[i][j];
+            int hl = pos_in_list(highlights, n_highlights, i, j);
+
+            // Determine if square is light or dark
+            int is_light_square = (i + j) % 2 == 0;
 
 #ifdef _WIN32
-                HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
-                CONSOLE_SCREEN_BUFFER_INFO info;
-                GetConsoleScreenBufferInfo(h, &info);
-                WORD orig = info.wAttributes;
-                
-                WORD bg_color;
-                if (hl)
-                {
-                    // Yellow/gold background for highlights
-                    bg_color = BACKGROUND_RED | BACKGROUND_GREEN | BACKGROUND_INTENSITY;
-                }
-                else if (is_light_square)
-                {
-                    // White/light gray background
-                    bg_color = BACKGROUND_RED | BACKGROUND_GREEN | BACKGROUND_BLUE | BACKGROUND_INTENSITY;
-                }
-                else
-                {
-                    // Blue/dark background
-                    bg_color = BACKGROUND_BLUE;
-                }
-                
-                // Set text color (black for light squares, white for dark squares)
-                WORD fg_color;
-                if (is_light_square && !hl)
-                    fg_color = 0; // Black text
-                else
-                    fg_color = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY; // White text
-                
-                SetConsoleTextAttribute(h, bg_color | fg_color);
-                
-                // Print piece on first line, empty space on second line
-                if (line == 0)
-                {
-                    if (c.state == 'E')
-                        printf("     ");
-                    else
-                        printf("  %s  ", piece_unicode(c.piece, c.state));
-                }
-                else
-                {
-                    printf("     ");
-                }
-                
-                SetConsoleTextAttribute(h, orig);
-#else
-                // ANSI escape codes for Unix/Linux
-                if (hl)
-                {
-                    // Yellow background for highlights
-                    printf("\x1b[48;5;226m\x1b[38;5;0m"); // yellow bg, black text
-                }
-                else if (is_light_square)
-                {
-                    // White/light gray background
-                    printf("\x1b[48;5;255m\x1b[38;5;0m"); // white bg, black text
-                }
-                else
-                {
-                    // Blue/dark background
-                    printf("\x1b[48;5;18m\x1b[38;5;255m"); // dark blue bg, white text
-                }
-                
-                // Print piece on first line, empty space on second line
-                if (line == 0)
-                {
-                    if (c.state == 'E')
-                        printf("     ");
-                    else
-                        printf("  %s  ", piece_unicode(c.piece, c.state));
-                }
-                else
-                {
-                    printf("     ");
-                }
-                
-                printf("\x1b[0m"); // Reset colors
-#endif
+            HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
+            CONSOLE_SCREEN_BUFFER_INFO info;
+            GetConsoleScreenBufferInfo(h, &info);
+            WORD orig = info.wAttributes;
+
+            WORD bg_color;
+            if (hl)
+            {
+                // Yellow/gold background for highlights
+                bg_color = BACKGROUND_RED | BACKGROUND_GREEN | BACKGROUND_INTENSITY;
             }
-            
-            if (line == 0)
-                printf(" %d\n", 8 - i);
+            else if (is_light_square)
+            {
+                // White/light gray background
+                bg_color = BACKGROUND_RED | BACKGROUND_GREEN | BACKGROUND_BLUE | BACKGROUND_INTENSITY;
+            }
             else
-                printf("\n");
+            {
+                // Blue/dark background
+                bg_color = BACKGROUND_BLUE;
+            }
+
+            // Set text color for good contrast
+            WORD fg_color;
+            if (c.state == 'W')
+            {
+                if (is_light_square)
+                {
+                    // White piece on light square: medium gray for contrast
+                    fg_color = FOREGROUND_INTENSITY;
+                }
+                else
+                {
+                    // White piece on dark square: bright white
+                    fg_color = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY;
+                }
+            }
+            else if (c.state == 'B')
+            {
+                if (is_light_square)
+                {
+                    // Black piece on light square: black
+                    fg_color = 0;
+                }
+                else
+                {
+                    // Black piece on dark square: light gray for contrast
+                    fg_color = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE;
+                }
+            }
+            else
+            {
+                // Empty square: use square color for text (won't be visible anyway)
+                fg_color = is_light_square ? 0 : FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE;
+            }
+
+            SetConsoleTextAttribute(h, bg_color | fg_color);
+
+            // 4 characters wide to balance with 2 line height (roughly square)
+            if (c.state == 'E')
+                printf("    ");
+            else
+                printf("  %s ", piece_unicode(c.piece, c.state));
+
+            SetConsoleTextAttribute(h, orig);
+#else
+            // ANSI escape codes for Unix/Linux
+            // Set background color
+            if (hl)
+            {
+                // Yellow background for highlights
+                printf("\x1b[48;5;226m"); // yellow bg
+            }
+            else if (is_light_square)
+            {
+                // White/light gray background
+                printf("\x1b[48;5;255m"); // white bg
+            }
+            else
+            {
+                // Blue/dark background
+                printf("\x1b[48;5;18m"); // dark blue bg
+            }
+
+            // Set text color for good contrast
+            if (c.state == 'W')
+            {
+                if (is_light_square)
+                {
+                    // White piece on light square: medium gray
+                    printf("\x1b[38;5;240m");
+                }
+                else
+                {
+                    // White piece on dark square: bright white
+                    printf("\x1b[38;5;231m");
+                }
+            }
+            else if (c.state == 'B')
+            {
+                if (is_light_square)
+                {
+                    // Black piece on light square: black
+                    printf("\x1b[38;5;16m");
+                }
+                else
+                {
+                    // Black piece on dark square: light gray
+                    printf("\x1b[38;5;250m");
+                }
+            }
+
+            // 4 characters wide to balance with 2 line height (roughly square)
+            if (c.state == 'E')
+                printf("    ");
+            else
+                printf("  %s ", piece_unicode(c.piece, c.state));
+
+            printf("\x1b[0m"); // Reset colors
+#endif
         }
+
+        printf(" %d ║\n", 8 - i);
+
+        // Second line for each row (empty) to make squares taller
+        printf("   ║   ");
+        for (int j = 0; j < 8; j++)
+        {
+            int is_light_square = (i + j) % 2 == 0;
+            int hl = pos_in_list(highlights, n_highlights, i, j);
+
+#ifdef _WIN32
+            HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
+            CONSOLE_SCREEN_BUFFER_INFO info;
+            GetConsoleScreenBufferInfo(h, &info);
+            WORD orig = info.wAttributes;
+
+            WORD bg_color;
+            if (hl)
+                bg_color = BACKGROUND_RED | BACKGROUND_GREEN | BACKGROUND_INTENSITY;
+            else if (is_light_square)
+                bg_color = BACKGROUND_RED | BACKGROUND_GREEN | BACKGROUND_BLUE | BACKGROUND_INTENSITY;
+            else
+                bg_color = BACKGROUND_BLUE;
+
+            SetConsoleTextAttribute(h, bg_color);
+            printf("    ");
+            SetConsoleTextAttribute(h, orig);
+#else
+            if (hl)
+                printf("\x1b[48;5;226m");
+            else if (is_light_square)
+                printf("\x1b[48;5;255m");
+            else
+                printf("\x1b[48;5;18m");
+
+            printf("    ");
+            printf("\x1b[0m");
+#endif
+        }
+        printf("   ║\n");
     }
-    printf("     a    b    c    d    e    f    g    h\n\n");
+
+    // Bottom border
+    printf("   ╠══════════════════════════════════════╣\n");
+    printf("   ║    a   b   c   d   e   f   g   h     ║\n");
+    printf("   ╚══════════════════════════════════════╝\n\n");
 }
 
 // ===================== Main (CLI) =====================
