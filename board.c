@@ -313,7 +313,7 @@ void board_apply_move(Board *b, int from_x, int from_y, int to_x, int to_y)
     b->last_to_x = to_x;
     b->last_to_y = to_y;
     b->has_last_move = 1;
-    
+
     // Update repetition table with next side to move
     char next = opposite_color(color);
     char key[512];
@@ -425,11 +425,11 @@ int adaptive_depth(Board *b)
     if (pieces >= 26)
         return 5;
     else if (pieces >= 18)
-        return 6;
+        return 5;
     else if (pieces >= 10)
-        return 7;
+        return 5;
     else if (pieces >= 7)
-        return 8;
+        return 5;
     else
-        return 9;
+        return 5;
 }
